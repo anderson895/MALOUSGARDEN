@@ -1,0 +1,237 @@
+/* Base styles */
+.top {
+    height: auto;
+    overflow: hidden;
+    position: relative;
+}
+
+.top .left, .top .right {
+    float: none;
+    text-align: center;
+}
+
+.top .left ul, .top .right ul {
+    margin-bottom: 0;
+    margin-top: 10px;
+}
+
+.top .left ul li, .top .right ul li {
+    float: none;
+    display: inline-block;
+}
+
+/* Add overlay to improve text contrast */
+.top .left, .top .right {
+    position: relative;
+    z-index: 1;
+}
+
+.top .left::after, .top .right::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4); /* semi-transparent black overlay */
+    z-index: -1; /* Keep the overlay behind text */
+}
+
+/* Media query for devices up to 767px (mobile) */
+@media only screen and (max-width: 767px) {
+    .top .left ul li, .top .right ul li {
+        text-align: center !important;
+    }
+
+    .top .right ul {
+        text-align: center !important;
+        margin-bottom: 20px !important;
+    }
+
+    .top .left ul {
+        margin-bottom: 0 !important;
+    }
+
+    .top .right ul li {
+        float: none !important;
+        display: inline-block !important;
+    }
+
+    .header .inner {
+        display: block !important;
+    }
+
+    .header .logo {
+        display: block !important;
+        width: 100% !important;
+        text-align: center !important;
+    }
+
+    .header .search-area, .header .right {
+        display: block !important;
+    }
+
+    .header .navbar-left {
+        text-align: center !important;
+        margin-bottom: 20px !important;
+    }
+
+    .navbar-form .form-group {
+        display: inline-block !important;
+    }
+
+    .navbar-form button {
+        display: inline-block !important;
+    }
+
+    .header form {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    /* Adjust font sizes and line height for better readability on small screens */
+    h1, h2, h3 {
+        font-size: 22px !important;
+        line-height: 1.4 !important;
+        color: white !important; /* Ensure text contrast with background */
+    }
+
+    p {
+        font-size: 16px !important;
+        line-height: 1.5 !important;
+        padding: 10px !important;
+        color: white !important; /* Ensure readability */
+    }
+
+    /* Ensure images are fully visible and not cut off */
+    .top img {
+        width: 100% !important;
+        height: auto !important;
+        object-fit: cover !important;
+    }
+
+    /* Adjust buttons for easier tapping */
+    .btn {
+        padding: 15px 30px !important;
+        font-size: 18px !important;
+    }
+}
+
+/* Media query for devices between 992px and 1199px (tablets and small desktops) */
+@media only screen and (min-width: 992px) and (max-width: 1199px) {
+    .bx-controls a.bx-prev, .bx-controls a.bx-next {
+        padding-top: 215px !important;
+    }
+}
+
+/* Media query for devices between 501px and 700px (tablets) */
+@media only screen and (min-width: 501px) and (max-width: 700px) {
+    ul.bxslider li, ul.bxslider li .text {
+        height: 300px !important;
+    }
+
+    .bx-controls a.bx-prev, .bx-controls a.bx-next {
+        font-size: 36px !important;
+    }
+
+    ul.bxslider li .text .inner h2 {
+        font-size: 30px !important;
+    }
+
+    ul.bxslider li .text .inner h3 {
+        font-size: 20px !important;
+    }
+
+    .bx-controls a.bx-prev, .bx-controls a.bx-next {
+        padding-top: 120px !important;
+    }
+
+    /* Adjust font sizes for tablets */
+    h1, h2, h3 {
+        font-size: 26px !important;
+        line-height: 1.4 !important;
+    }
+
+    p {
+        font-size: 18px !important;
+        line-height: 1.5 !important;
+    }
+
+    .btn {
+        padding: 20px 40px !important;
+        font-size: 20px !important;
+    }
+}
+
+/* Media query for devices up to 500px (very small screens) */
+@media only screen and (min-width: 0px) and (max-width: 500px) {
+    ul.bxslider li, ul.bxslider li .text {
+        height: 250px !important;
+    }
+
+    .bx-controls a.bx-prev, .bx-controls a.bx-next {
+        font-size: 30px !important;
+    }
+
+    ul.bxslider li .text .inner h2 {
+        font-size: 24px !important;
+    }
+
+    ul.bxslider li .text .inner h3 {
+        font-size: 16px !important;
+    }
+
+    .bx-controls a.bx-prev, .bx-controls a.bx-next {
+        padding-top: 100px !important;
+    }
+
+    /* Adjust font sizes for small screens */
+    h1, h2, h3 {
+        font-size: 18px !important;
+        line-height: 1.4 !important;
+    }
+
+    p {
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+    }
+
+    .btn {
+        padding: 12px 25px !important;
+        font-size: 16px !important;
+    }
+}
+
+/* Media query for devices 992px and above (large screens and desktops) */
+@media only screen and (min-width: 992px) {
+    .product .text {
+        min-height: 190px !important;
+    }
+
+    .header .inner {
+        width: 100% !important;
+    }
+
+    .header .search-area {
+        padding-right: 0 !important;
+    }
+
+    .header .search-area form {
+        padding-right: 0 !important;
+    }
+
+    .header .container {
+        padding-right: 0 !important;
+    }
+
+    /* Adjust font sizes for large screens */
+    h1, h2, h3 {
+        font-size: 32px !important;
+        line-height: 1.4 !important;
+    }
+
+    p {
+        font-size: 20px !important;
+        line-height: 1.5 !important;
+    }
+}

@@ -1,0 +1,7 @@
+include ':app'
+rootProject.name = "ARApp"
+include ':sceneform'
+project(':sceneform').projectDir=new File('sceneformsrc/sceneform')
+
+include ':sceneformux'
+project(':sceneformux').projectDir=new File('sceneformux/ux')
