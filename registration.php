@@ -1,5 +1,7 @@
 <?php require_once('header.php'); ?>
 <?php
+
+error_reporting(0);
 // Include PHPMailer
 require 'vendor/autoload.php';
 use PHPMailer\PHPMailer\PHPMailer;
