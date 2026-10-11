@@ -119,14 +119,18 @@ if(isset($_POST['checkout'])) {
 
         // Insert transaction into payment table for each product
         foreach($_SESSION['cart_items'] as $item) {
-            $statement = $pdo->prepare("INSERT INTO tbl_payment (customer_id, customer_name, customer_email, payment_date, paid_amount, payment_method, payment_status, shipping_status, payment_id, product_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            // Walk-in sales are paid in full right away (balance 0)
+            $statement = $pdo->prepare("INSERT INTO tbl_payment (customer_id, customer_name, customer_email, payment_date, paid_amount, total_amount, transaction_image, payment_method, payment_option, payment_status, shipping_status, payment_id, product_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $statement->execute(array(
                 $customer_id,
                 $customer_name,
                 $customer_email,
                 date('Y-m-d H:i:s'),
                 $item['price'] * $item['quantity'],
+                $item['price'] * $item['quantity'],
+                '',
                 $payment_method,
+                OPTION_FULL_PAYMENT,
                 'Completed',
                 'Pending',
                 $payment_id,
@@ -203,9 +207,9 @@ if(!empty($success_message)) {
                     <!-- Category Filters -->
                     <div class="box-body" style="padding-bottom: 0;">
                         <div class="category-filters">
-                            <a href="POS.php" class="btn btn-default <?php if(!isset($_GET['category'])) echo 'active'; ?>">All</a>
+                            <a href="pos.php" class="btn btn-default <?php if(!isset($_GET['category'])) echo 'active'; ?>">All</a>
                             <?php foreach($categories as $category): ?>
-                                <a href="POS.php?category=<?php echo $category['tcat_id']; ?>"
+                                <a href="pos.php?category=<?php echo $category['tcat_id']; ?>"
                                    class="btn btn-default <?php if(isset($_GET['category']) && $_GET['category'] == $category['tcat_id']) echo 'active'; ?>">
                                     <?php echo $category['tcat_name']; ?>
                                 </a>
@@ -254,7 +258,7 @@ if(!empty($success_message)) {
                         <h3 class="box-title"><i class="fa fa-shopping-basket"></i> Current Cart</h3>
                         <?php if(count($cart_items) > 0): ?>
                             <div class="box-tools pull-right">
-                                <a href="POS.php?clear_cart=1" class="btn btn-box-tool text-danger" onclick="return confirm('Are you sure you want to clear the cart?');">
+                                <a href="pos.php?clear_cart=1" class="btn btn-box-tool text-danger" onclick="return confirm('Are you sure you want to clear the cart?');">
                                     <i class="fa fa-trash"></i> Clear
                                 </a>
                             </div>
@@ -291,7 +295,7 @@ if(!empty($success_message)) {
                                         </td>
                                         <td>₱<?php echo number_format($item['price'] * $item['quantity'], 2); ?></td>
                                         <td>
-                                            <a href="POS.php?remove_item=<?php echo $index; ?>" class="text-danger">
+                                            <a href="pos.php?remove_item=<?php echo $index; ?>" class="text-danger">
                                                 <i class="fa fa-times"></i>
                                             </a>
                                         </td>
@@ -658,7 +662,7 @@ if(!empty($success_message)) {
             // Function to update cart item quantity
             function updateCartItemQuantity(index, quantity) {
                 $.ajax({
-                    url: 'POS.php',
+                    url: 'pos.php',
                     type: 'POST',
                     data: {
                         action: 'update_quantity',

@@ -173,32 +173,39 @@ if(!isset($_REQUEST['id'])) {
 	</div>
 </section>
 
+
 <?php
-$statement = $pdo->prepare("SELECT * FROM tbl_product WHERE p_id=?");
-$statement->execute(array($_REQUEST['id']));
-$result = $statement->fetchAll(PDO::FETCH_ASSOC);
-foreach ($result as $row) {
-	$p_name = $row['p_name'];
-	$p_old_price = $row['p_old_price'];
-	$p_current_price = $row['p_current_price'];
-	$p_qty = $row['p_qty'];
-	$p_featured_photo = $row['p_featured_photo'];
-	$p_description = $row['p_description'];
-	$p_short_description = $row['p_short_description'];	
-	$p_is_featured = $row['p_is_featured'];
-	$p_is_active = $row['p_is_active'];
-	$tcat_id = $row['tcat_id'];
-}
+// Get the product ID safely (assuming GET method)
+$p_id = isset($_GET['id']) ? $_GET['id'] : 0;
 
-$statement = $pdo->prepare("SELECT * 
-                        FROM tbl_category ");
-$statement->execute(array($tcat_id));
-$result = $statement->fetchAll(PDO::FETCH_ASSOC);
-foreach ($result as $row) {
-	$tcat_name = $row['tcat_name'];
-}
+// Fetch product info
+$statement = $pdo->prepare("SELECT * FROM tbl_product WHERE p_id = ?");
+$statement->execute([$p_id]);
+$result = $statement->fetch(PDO::FETCH_ASSOC);
 
+if ($result) {
+    $p_name = $result['p_name'];
+    $p_old_price = $result['p_old_price'];
+    $p_current_price = $result['p_current_price'];
+    $p_qty = $result['p_qty'];
+    $p_featured_photo = $result['p_featured_photo'];
+    $p_description = $result['p_description'];
+    $p_short_description = $result['p_short_description'];
+    $p_is_featured = $result['p_is_featured'];
+    $p_is_active = $result['p_is_active'];
+    $tcat_id = $result['tcat_id'];
+
+    // Fetch category name
+    $statement = $pdo->prepare("SELECT tcat_name FROM tbl_category WHERE tcat_id = ?");
+    $statement->execute([$tcat_id]);
+    $cat_result = $statement->fetch(PDO::FETCH_ASSOC);
+
+    $tcat_name = $cat_result ? $cat_result['tcat_name'] : 'Unknown Category';
+} else {
+    echo "Product not found.";
+}
 ?>
+
 
 
 <section class="content">

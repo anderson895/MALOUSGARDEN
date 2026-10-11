@@ -24,6 +24,10 @@
     <script src="js/clipboard.min.js"></script>
 	<script src="js/demo.js"></script>
 	<script src="js/summernote.js"></script>
+	
+	<!-- Include jsPDF -->
+ 
+
 
 	<script>
 		$(document).ready(function() {

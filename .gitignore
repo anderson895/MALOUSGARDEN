@@ -1,0 +1,6 @@
+/revision/
+/admin/inc/mail-config.php
+# Deployment bundle (too big for GitHub)
+/public_html.zip
+# Customers' GCash receipts (private)
+/assets/uploads/transaction_*

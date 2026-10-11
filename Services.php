@@ -67,22 +67,6 @@
         </div>
     </div>
 
-    <!-- QR Code Section -->
-    <div class="qr-section">
-        <div class="container">
-            <div class="row">
-                <div class="col-md-6 offset-md-3 text-center">
-                    <h3>Scan to Download</h3>
-                    <p>Use your phone camera to scan this QR code and download our app directly.</p>
-                    <div class="qr-code">
-                        <!-- Replace with actual QR code image that links to your APK -->
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://yourwebsite.com/downloads/your-app.apk" alt="QR Code">
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="carousel">
     <div class="carousel-container">
     <h1 class="landscape-title">Malou's Garden Landscape Services Project</h1>
@@ -168,7 +152,7 @@
             text-align: center;
             font-size: 42px;
             font-weight: 700;
-            margin-bottom: 20px;
+            margin: 20px;
             color: #2c3e50;
         }
         

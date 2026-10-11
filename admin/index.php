@@ -30,16 +30,28 @@ $statement = $pdo->prepare("SELECT * FROM tbl_payment WHERE payment_status=?");
 $statement->execute(array('Pending'));
 $total_order_pending = $statement->rowCount();
 
-$statement = $pdo->prepare("SELECT * FROM tbl_payment WHERE payment_status=? AND shipping_status=?");
-$statement->execute(array('Completed','Pending'));
+// Paid (down payment or full) but not yet delivered
+$statement = $pdo->prepare("SELECT * FROM tbl_payment WHERE payment_status IN ('Partially Paid','Completed') AND shipping_status<>?");
+$statement->execute(array('Completed'));
 $total_order_complete_shipping_pending = $statement->rowCount();
 
-$statement = $pdo->prepare("SELECT SUM(paid_amount) AS paid_amount FROM tbl_payment WHERE payment_status=?");
-$statement->execute(array('Completed'));
+// Sales = confirmed payments received, including down payments
+$statement = $pdo->prepare("SELECT SUM(paid_amount) AS paid_amount FROM tbl_payment WHERE payment_status IN ('Partially Paid','Completed')");
+$statement->execute();
 $result = $statement->fetchAll(PDO::FETCH_ASSOC);
 foreach ($result as $row) {
     $total_revenue = $row['paid_amount'];
 }
+
+// Customer payments waiting for the admin's confirmation
+$statement = $pdo->prepare("SELECT COUNT(*) FROM tbl_payment_history WHERE status='Pending'");
+$statement->execute();
+$total_payments_to_verify = $statement->fetchColumn();
+
+// Balances still to be collected from partially paid orders
+$statement = $pdo->prepare("SELECT COALESCE(SUM(total_amount - paid_amount),0) FROM tbl_payment WHERE payment_status='Partially Paid'");
+$statement->execute();
+$total_outstanding = $statement->fetchColumn();
 
 // Get monthly income data for the chart
 $monthly_income = array_fill(0, 12, 0); // Initialize array with 0 for all 12 months
@@ -47,10 +59,10 @@ $statement = $pdo->prepare("
     SELECT 
         MONTH(payment_date) as month,
         SUM(paid_amount) as total
-    FROM 
+    FROM
         tbl_payment
-    WHERE 
-        payment_status = 'Completed'
+    WHERE
+        payment_status IN ('Partially Paid','Completed')
         AND YEAR(payment_date) = YEAR(CURRENT_DATE)
     GROUP BY 
         MONTH(payment_date)
@@ -185,20 +197,51 @@ foreach ($top_products as $product) {
                             <i class="ionicons ion-arrow-up-b" style="font-size: 50px; color: white;"></i>
                         </div>
                     </div>
+                </a>
             </div>
 
             <!-- Total Revenue -->
             <div class="col-lg-3 col-xs-6">
-                <a href="index.php" style="text-decoration: none;">
+
                     <div class="small-box bg-green">
                         <div class="inner">
-                            <h3>₱<?php echo $total_revenue; ?></h3>
+                            <h3>₱<?php echo number_format((float)$total_revenue, 2); ?></h3>
                             <p>Total Sales</p>
                         </div>
                         <div class="icon">
                             <i class="ionicons ion-android-checkbox-outline" style="font-size: 50px; color: white;"></i>
                         </div>
                     </div>
+            </div>
+
+            <!-- Payments to Verify -->
+            <div class="col-lg-3 col-xs-6">
+                <a href="order.php" style="text-decoration: none;">
+                    <div class="small-box bg-yellow">
+                        <div class="inner">
+                            <h3><?php echo $total_payments_to_verify; ?></h3>
+                            <p>Payments to Verify</p>
+                        </div>
+                        <div class="icon">
+                            <i class="ionicons ion-card" style="font-size: 50px; color: white;"></i>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Outstanding Balances -->
+            <div class="col-lg-3 col-xs-6">
+                <a href="order.php" style="text-decoration: none;">
+                    <div class="small-box bg-red">
+                        <div class="inner">
+                            <h3>₱<?php echo number_format((float)$total_outstanding, 2); ?></h3>
+                            <p>Outstanding Balances</p>
+                        </div>
+                        <div class="icon">
+                            <i class="ionicons ion-cash" style="font-size: 50px; color: white;"></i>
+                        </div>
+                    </div>
+                </a>
             </div>
         </div>
         <?php if(isset($_SESSION['user']['role']) && $_SESSION['user']['role'] == 'superadmin'): ?>
@@ -215,6 +258,24 @@ foreach ($top_products as $product) {
                         </strong>
                     </div>
                     <div class="panel-body">
+                        
+                                      <!-- Month Selection Dropdown -->
+                    <label for="monthSelect">Select Sales Month:</label>
+                    <select id="monthSelect">
+                      <option value="all">General (All Months)</option>
+                      <option value="specific">Specific Month</option>
+                    </select>
+                    
+                    <!-- Specific Month Picker (Visible only when 'Specific Month' is selected) -->
+                    <div id="specificMonthDiv" style="display:none;">
+                      <label for="month">Select Specific Month:</label>
+                      <input type="month" id="month" name="month">
+                    </div>
+                    
+                    <!-- Export to PDF Button -->
+                    <button id="exportBtn">Export to PDF</button>
+                                        
+                        
                         <div id="monthlyIncomeChart"></div>
                     </div>
                 </div>
@@ -235,6 +296,66 @@ foreach ($top_products as $product) {
                 </div>
             </div>
         </div>
+        
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script>
+            
+          $(document).ready(function() {
+              // Show specific month input if "Specific Month" is selected
+              $('#monthSelect').change(function() {
+                if ($(this).val() == 'specific') {
+                  $('#specificMonthDiv').show(); // Show specific month input
+                } else {
+                  $('#specificMonthDiv').hide(); // Hide specific month input
+                }
+              });
+            
+              // Export PDF on button click
+              $('#exportBtn').click(function() {
+                var selectedMonth = $('#monthSelect').val();
+                var specificMonth = selectedMonth === 'specific' ? $('#month').val().slice(5, 7) : 'all'; // Extract month from YYYY-MM format
+            
+                // AJAX request to fetch sales data and generate PDF
+                $.ajax({
+                  url: 'export-income.php',  // Your PHP file to generate PDF
+                  method: 'POST',
+                  data: { month: specificMonth },
+                  xhrFields: {
+                    responseType: 'blob'  // We are expecting a PDF response
+                  },
+                  success: function(response) {
+                    // Create a download link for the PDF
+                    var link = document.createElement('a');
+                    link.href = URL.createObjectURL(response);  // Create URL for the blob
+                    link.download = 'monthly_income_report.pdf'; // Set the file name
+                    link.click();  // Trigger the download
+                  },
+                  error: function(error) {
+                    console.error("Error generating PDF:", error);
+                  }
+                });
+              });
+            });
+            function exportToPDF(data) {
+              const doc = new jsPDF();
+            
+              // Title
+              doc.text("Monthly Income Report", 20, 20);
+              
+              // Loop through the sales data and add it to the PDF
+              let y = 40;  // Initial position for text
+              data.forEach(item => {
+                doc.text(`Product: ${item.product_name} - Sales: ${item.total_sales}`, 20, y);
+                y += 10; // Move down for the next line
+              });
+            
+              // Save the PDF file
+              doc.save('monthly_income_report.pdf');
+            }
+
+
+        </script>
+        
 <?php endif; ?>
         <div class="row">
             <!-- Highest Selling Products -->

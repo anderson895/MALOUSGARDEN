@@ -2,7 +2,7 @@
 <?php
 // Check if payment_id is provided
 if (!isset($_GET['payment_id']) || empty($_GET['payment_id'])) {
-    header('location: view-order.php');
+    header('location: order.php');
     exit;
 }
 
@@ -14,7 +14,7 @@ $statement->execute(array($payment_id));
 $payment = $statement->fetch(PDO::FETCH_ASSOC);
 
 if (!$payment) {
-    header('location: view-order.php');
+    header('location: order.php');
     exit;
 }
 
@@ -23,9 +23,31 @@ $statement = $pdo->prepare("SELECT * FROM tbl_order WHERE payment_id=?");
 $statement->execute(array($payment_id));
 $order_items = $statement->fetchAll(PDO::FETCH_ASSOC);
 
-// Get customer address if available
+// Totals (a POS sale can have several rows for one transaction)
+$statement = $pdo->prepare("SELECT SUM(total_amount) AS total, SUM(paid_amount) AS paid, SUM(shipping_fee) AS shipping FROM tbl_payment WHERE payment_id=?");
+$statement->execute(array($payment_id));
+$sums = $statement->fetch(PDO::FETCH_ASSOC);
+
+// Confirmed payments (down payment, balance payments, cash)
+$statement = $pdo->prepare("SELECT * FROM tbl_payment_history WHERE payment_id=? AND status='Confirmed' ORDER BY id");
+$statement->execute(array($payment_id));
+$confirmed_payments = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+if ($payment['payment_status'] == 'Completed') {
+    $payment_remark = 'Fully Paid';
+} elseif ($payment['payment_status'] == 'Partially Paid') {
+    $payment_remark = 'Partially Paid (Down Payment)';
+} else {
+    $payment_remark = 'Unpaid / For Verification';
+}
+$shipping_labels = array('Pending' => 'Pending', 'To-Ship' => 'To Ship', 'Shipped' => 'Shipped', 'Completed' => 'Delivered');
+$shipping_remark = isset($shipping_labels[$payment['shipping_status']]) ? $shipping_labels[$payment['shipping_status']] : $payment['shipping_status'];
+
+// Get customer address if available (the address saved with the order first)
 $customer_address = '';
-if ($payment['customer_id'] > 0) {
+if (!empty($payment['shipping_address'])) {
+    $customer_address = $payment['shipping_name'] . ' (' . $payment['shipping_phone'] . ")\n" . $payment['shipping_address'];
+} elseif ($payment['customer_id'] > 0) {
     $statement = $pdo->prepare("SELECT cust_s_address FROM tbl_customer WHERE cust_id=?");
     $statement->execute(array($payment['customer_id']));
     $result = $statement->fetch(PDO::FETCH_ASSOC);
@@ -55,13 +77,15 @@ if ($result) {
     
 }
 
-// Calculate subtotal and taxes
+// Calculate subtotal, shipping fee and balance
 $subtotal = 0;
 foreach ($order_items as $item) {
     $subtotal += $item['unit_price'] * $item['quantity'];
 }
-$tax = $subtotal * 0.10; // Assuming 12% tax
-$total = $subtotal + $tax;
+$shipping_fee = (float)$sums['shipping'];
+$total = (float)$sums['total'];
+$amount_paid = (float)$sums['paid'];
+$balance_due = max(0, $total - $amount_paid);
 ?>
 
 <!DOCTYPE html>
@@ -273,8 +297,8 @@ $total = $subtotal + $tax;
             <h1>INVOICE</h1>
             <p>Invoice #: <?php echo $payment_id; ?></p>
             <p>Date: <?php echo date('d M Y', strtotime($payment['payment_date'])); ?></p>
-            <p>Payment Status: <strong><?php echo $payment['payment_status']; ?></strong></p>
-            <p>Shipping Status: <strong><?php echo $payment['shipping_status']; ?></strong></p>
+            <p>Payment Status: <strong><?php echo $payment_remark; ?></strong></p>
+            <p>Shipping Status: <strong><?php echo $shipping_remark; ?></strong></p>
         </div>
     </div>
 
@@ -290,10 +314,16 @@ $total = $subtotal + $tax;
         <div class="invoice-payment">
             <div class="invoice-heading">Payment Information</div>
             <p><strong>Method:</strong> <?php echo $payment['payment_method']; ?></p>
-            <?php if ($payment['payment_method'] == 'PayPal'): ?>
-                <p><strong>Transaction ID:</strong> <?php echo $payment['txnid']; ?></p>
-            <?php elseif ($payment['payment_method'] == 'Gcash'): ?>
-                <p><strong>Transaction Details:</strong> Available in system</p>
+            <p><strong>Payment Option:</strong> <?php echo $payment['payment_option']; ?></p>
+            <?php if (count($confirmed_payments) > 0): ?>
+                <p><strong>Payments Received:</strong></p>
+                <?php foreach ($confirmed_payments as $cp): ?>
+                    <p style="margin:2px 0;">
+                        <?php echo date('d M Y', strtotime($cp['confirmed_at'] ? $cp['confirmed_at'] : $cp['submitted_at'])); ?> &ndash;
+                        <?php echo htmlspecialchars($cp['payment_type']); ?> (<?php echo htmlspecialchars($cp['payment_method']); ?><?php echo $cp['reference_no'] != '' ? ', Ref. ' . htmlspecialchars($cp['reference_no']) : ''; ?>):
+                        <?php echo peso($cp['amount']); ?>
+                    </p>
+                <?php endforeach; ?>
             <?php endif; ?>
         </div>
     </div>
@@ -325,12 +355,20 @@ $total = $subtotal + $tax;
             <div>₱ <?php echo number_format($subtotal, 2); ?></div>
         </div>
         <div class="invoice-total-row">
-            <div>Tax (10%):</div>
-            <div>₱ <?php echo number_format($tax, 2); ?></div>
+            <div>Shipping Fee:</div>
+            <div>₱ <?php echo number_format($shipping_fee, 2); ?></div>
         </div>
         <div class="invoice-total-row invoice-grand-total">
             <div>TOTAL:</div>
             <div>₱ <?php echo number_format($total, 2); ?></div>
+        </div>
+        <div class="invoice-total-row">
+            <div>Amount Paid:</div>
+            <div>₱ <?php echo number_format($amount_paid, 2); ?></div>
+        </div>
+        <div class="invoice-total-row invoice-grand-total" style="color: <?php echo $balance_due > 0 ? '#c62828' : '#2e7d32'; ?>;">
+            <div>BALANCE DUE:</div>
+            <div>₱ <?php echo number_format($balance_due, 2); ?></div>
         </div>
     </div>
 

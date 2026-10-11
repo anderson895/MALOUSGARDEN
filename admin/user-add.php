@@ -35,8 +35,8 @@
                             <label for="role">Role <span>*</span></label>
                             <select class="form-control" name="role" required>
                                 <option value="user">User</option>
-                                <option value="admin">Admin</option>
-                                <option value="super_admin">Super Admin</option>
+                                <option value="admin">Cashier</option>
+                                <option value="super_admin">Admin</option>
                             </select>
                         </div>
                         <div class="form-group">

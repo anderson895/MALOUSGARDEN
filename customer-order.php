@@ -25,19 +25,21 @@ if(!isset($_SESSION['customer'])) {
             </div>
             <div class="col-md-12">
                 <div class="user-content">
-                    <h3><?php echo "Order History"; ?></h3>
+                    <h3><?php echo "My Orders"; ?></h3>
+                    <p class="text-muted">Click <b>View &amp; Track</b> to see the order timeline and payment history, or to pay your remaining balance through GCash.</p>
                     <div class="table-responsive">
                         <table class="table table-bordered table-striped table-hover">
                             <thead>
                                 <tr>
                                     <th><?php echo '#' ?></th>
+                                    <th><?php echo "Order"; ?></th>
                                     <th><?php echo "Product Details"; ?></th>
-                                    <th><?php echo "Payment Date and Time"; ?></th>
-                                    <th><?php echo "Paid Amount"; ?></th>
+                                    <th><?php echo "Total"; ?></th>
+                                    <th><?php echo "Amount Paid"; ?></th>
+                                    <th><?php echo "Balance"; ?></th>
                                     <th><?php echo "Payment Status"; ?></th>
                                     <th><?php echo "Shipping Status"; ?></th>
-                                    <th><?php echo "Payment Method"; ?></th>
-                                    <th><?php echo "Payment ID"; ?></th>
+                                    <th><?php echo "Action"; ?></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -147,9 +149,16 @@ if(!isset($_SESSION['customer'])) {
                                 $tip = $page*10-10;
                                 foreach ($result as $row) {
                                     $tip++;
+                                    $balance = max(0, $row['total_amount'] - $row['paid_amount']);
+                                    $pending = count_pending_payments($pdo, $row['payment_id']);
                                     ?>
                                     <tr>
                                         <td><?php echo $tip; ?></td>
+                                        <td>
+                                            <b>#<?php echo $row['payment_id']; ?></b><br>
+                                            <?php echo date('M d, Y h:i A', strtotime($row['payment_date'])); ?><br>
+                                            <small><?php echo $row['payment_method']; ?> &middot; <?php echo $row['payment_option']; ?></small>
+                                        </td>
                                         <td>
                                             <?php
                                             $statement1 = $pdo->prepare("SELECT * FROM tbl_order WHERE payment_id=?");
@@ -158,21 +167,26 @@ if(!isset($_SESSION['customer'])) {
                                             foreach ($result1 as $row1) {
                                                 echo 'Product Name: '.$row1['product_name'];
                                                 echo '<br>Quantity: '.$row1['quantity'];
-                                                echo '<br>Unit Price: ₱'.$row1['unit_price'];
+                                                echo '<br>Unit Price: '.peso($row1['unit_price']);
                                                 echo '<br><br>';
                                             }
                                             ?>
                                         </td>
-                                        <td><?php echo $row['payment_date']; ?></td>
-                                        <td><?php echo '₱'.$row['paid_amount']; ?></td>
-                                        <td><?php echo $row['payment_status']; ?></td>
-                                        <td><?php echo $row['shipping_status']; ?></td>
-                                        <td><?php echo $row['payment_method']; ?></td>
-                                        <td><?php echo $row['payment_id']; ?></td>
+                                        <td><?php echo peso($row['total_amount']); ?></td>
+                                        <td><?php echo peso($row['paid_amount']); ?></td>
+                                        <td><b style="color:<?php echo $balance > 0 ? '#c62828' : '#2e7d32'; ?>"><?php echo peso($balance); ?></b></td>
+                                        <td><?php echo payment_status_badge($row['payment_status'], $pending); ?></td>
+                                        <td><?php echo shipping_status_badge($row['shipping_status']); ?></td>
+                                        <td>
+                                            <a href="customer-order-detail.php?id=<?php echo urlencode($row['payment_id']); ?>" class="btn btn-primary btn-xs" style="margin-bottom:4px;">View &amp; Track</a>
+                                            <?php if($balance > 0 && $pending == 0): ?>
+                                                <a href="customer-order-detail.php?id=<?php echo urlencode($row['payment_id']); ?>#pay-balance" class="btn btn-success btn-xs"><?php echo $row['paid_amount'] > 0 ? 'Pay Balance' : 'Submit Payment'; ?></a>
+                                            <?php endif; ?>
+                                        </td>
                                     </tr>
                                     <?php
-                                } 
-                                ?>                               
+                                }
+                                ?>
                                 
                             </tbody>
                         </table>

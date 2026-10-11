@@ -163,7 +163,7 @@ foreach ($result as $row) {
                                                 ₱<?php echo $row['p_current_price']; ?> 
                                                 <?php if($row['p_old_price'] != ''): ?>
                                                 <del>
-                                                    $<?php echo $row['p_old_price']; ?>
+                                                    ₱<?php echo $row['p_old_price']; ?>
                                                 </del>
                                                 <?php endif; ?>
                                             </h4>

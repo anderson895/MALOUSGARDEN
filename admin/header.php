@@ -133,6 +133,12 @@ $user_role = isset($_SESSION['user']['role']) ? $_SESSION['user']['role'] : '';
 
 
 
+                    <li class="treeview <?php if( ($cur_page == 'inventory-report.php') ) {echo 'active';} ?>">
+                        <a href="inventory-report.php">
+                            <i class="fa fa-bar-chart"></i> <span>Inventory Report</span>
+                        </a>
+                    </li>
+
                     <li class="treeview <?php if( ($cur_page == 'feedback.php') ) {echo 'active';} ?>">
                         <a href="feedback.php">
                             <i class="fa fa-commenting"></i> <span>View feedbacks</span>

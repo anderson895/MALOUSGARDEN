@@ -50,6 +50,12 @@ if(!isset($_REQUEST['id'])) {
 	$statement = $pdo->prepare("DELETE FROM tbl_order WHERE payment_id=?");
 	$statement->execute(array($payment_id));
 
+	// Delete the order's payment history and timeline
+	$statement = $pdo->prepare("DELETE FROM tbl_payment_history WHERE payment_id=?");
+	$statement->execute(array($payment_id));
+	$statement = $pdo->prepare("DELETE FROM tbl_order_timeline WHERE payment_id=?");
+	$statement->execute(array($payment_id));
+
 	// Delete from tbl_payment
 	$statement = $pdo->prepare("DELETE FROM tbl_payment WHERE id=?");
 	$statement->execute(array($_REQUEST['id']));

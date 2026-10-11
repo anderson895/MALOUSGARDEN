@@ -74,7 +74,7 @@ if (isset($_GET['message']) && $_GET['message'] == 'deleted') {
                                         <b>Visitor Name:</b> <?php echo $row['visitor_name']; ?><br>
                                         <b>Visitor Phone:</b><br> <?php echo $row['visitor_phone']; ?><br>
                                         <b>Visitor Email:</b><br> <?php echo $row['visitor_email']; ?><br><br>
-                                        <a href="#" data-toggle="modal" data-target="#model-<?php echo $i; ?>" class="btn btn-warning btn-xs" style="width:100%;margin-bottom:4px;">Send Reply Message</a>
+                                       
                                         <div id="model-<?php echo $i; ?>" class="modal fade" role="dialog">
                                             <div class="modal-dialog">
                                                 <div class="modal-content">

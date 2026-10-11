@@ -4,143 +4,185 @@ session_start();
 include("../../admin/inc/config.php");
 include("../../admin/inc/functions.php");
 
-if (!isset($_REQUEST['msg'])) {
-    if (!isset($_FILES['transaction_image']) || $_FILES['transaction_image']['error'] !== UPLOAD_ERR_OK) {
-        header('location: ../../checkout.php?error=File upload failed');
-        exit;
-    } else {
-        $payment_date = date('Y-m-d H:i:s');
-        $payment_id = time();
+function back_to_checkout($message)
+{
+    header('location: ../../checkout.php?error=' . urlencode($message));
+    exit;
+}
 
-        $transaction_image = $_FILES['transaction_image'];
-        $upload_dir = '../../assets/uploads/';
-        // Ensure upload directory exists
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0755, true);
-        }
+if (!isset($_SESSION['customer'])) {
+    header('location: ../../login.php');
+    exit;
+}
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('location: ../../checkout.php');
+    exit;
+}
+// An upload bigger than post_max_size arrives with an empty $_POST
+if (empty($_POST)) {
+    back_to_checkout('The uploaded file is too large. Please upload a smaller screenshot.');
+}
+if (empty($_POST['agree_terms'])) {
+    back_to_checkout('Please read and accept the Terms and Conditions before submitting.');
+}
 
-        $imageFileType = strtolower(pathinfo($transaction_image['name'], PATHINFO_EXTENSION));
+$customer = $_SESSION['customer'];
 
-        // Validate image file
-        $check = getimagesize($transaction_image['tmp_name']);
-        if ($check === false) {
-            header('location: ../../checkout.php?error=File is not an image');
-            exit;
-        }
+$statement = $pdo->prepare("SELECT * FROM tbl_customer_address WHERE addr_id=? AND cust_id=?");
+$statement->execute(array(isset($_POST['address_id']) ? $_POST['address_id'] : 0, $customer['cust_id']));
+$address = $statement->fetch(PDO::FETCH_ASSOC);
+if (!$address) {
+    back_to_checkout('Please choose a shipping address.');
+}
 
-        // Allowed extensions
-        $allowed_extensions = array('jpg', 'jpeg', 'png', 'gif');
-        if (!in_array($imageFileType, $allowed_extensions)) {
-            header('location: ../../checkout.php?error=Invalid file type');
-            exit;
-        }
+$option = isset($_POST['payment_option']) ? $_POST['payment_option'] : '';
+if (!in_array($option, array('down', 'full'))) {
+    back_to_checkout('Please choose a payment option.');
+}
 
-        // Generate a unique file name to avoid overwriting
-        $unique_name = uniqid('transaction_', true) . '.' . $imageFileType;
-        $upload_file = $upload_dir . $unique_name;
+$reference_no = clean_reference_no(isset($_POST['reference_no']) ? $_POST['reference_no'] : '');
+if ($reference_no == '') {
+    back_to_checkout('Please enter the GCash reference number shown on your receipt.');
+}
 
-        if (!move_uploaded_file($transaction_image['tmp_name'], $upload_file)) {
-            header('location: ../../checkout.php?error=Failed to move uploaded file');
-            exit;
-        }
+// Totals are computed here from the database prices, never from the form
+$items = get_selected_cart_items($pdo);
+if (count($items) == 0) {
+    header('location: ../../cart.php');
+    exit;
+}
+$subtotal = 0;
+foreach ($items as $item) {
+    if ($item['qty'] > $item['stock']) {
+        back_to_checkout('Sorry, only ' . max(0, $item['stock']) . ' item(s) of "' . $item['name'] . '" are in stock.');
+    }
+    $subtotal += $item['total'];
+}
+$total_amount = $subtotal + SHIPPING_FEE;
+if ($option == 'down') {
+    $amount_now = down_payment_amount($total_amount);
+    $payment_option = OPTION_DOWN_PAYMENT;
+    $payment_type = 'Down Payment';
+} else {
+    $amount_now = $total_amount;
+    $payment_option = OPTION_FULL_PAYMENT;
+    $payment_type = 'Full Payment';
+}
 
-        // Insert payment record
-        $statement = $pdo->prepare("INSERT INTO tbl_payment (   
+$upload_error = '';
+$transaction_image = upload_transaction_image(
+    isset($_FILES['transaction_image']) ? $_FILES['transaction_image'] : null,
+    '../../assets/uploads/',
+    $upload_error
+);
+if ($transaction_image === false) {
+    back_to_checkout($upload_error);
+}
+
+$payment_date = date('Y-m-d H:i:s');
+$payment_id = time();
+$statement = $pdo->prepare("SELECT COUNT(*) FROM tbl_payment WHERE payment_id=?");
+do {
+    $statement->execute(array($payment_id));
+    $taken = $statement->fetchColumn() > 0;
+    if ($taken) {
+        $payment_id++;
+    }
+} while ($taken);
+
+$product_ids = array();
+foreach ($items as $item) {
+    $product_ids[] = $item['id'];
+}
+
+// Order header; paid_amount stays 0 until the admin confirms the payment
+$statement = $pdo->prepare("INSERT INTO tbl_payment (
                                 customer_id,
                                 customer_name,
                                 customer_email,
                                 payment_date,
-                                paid_amount,                          
+                                paid_amount,
+                                total_amount,
+                                shipping_fee,
                                 transaction_image,
                                 payment_method,
+                                payment_option,
                                 payment_status,
                                 shipping_status,
                                 payment_id,
-                                product_id
-                            ) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+                                product_id,
+                                shipping_name,
+                                shipping_phone,
+                                shipping_address,
+                                shipping_lat,
+                                shipping_lng
+                            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+$statement->execute(array(
+    $customer['cust_id'],
+    $customer['cust_name'],
+    $customer['cust_email'],
+    $payment_date,
+    0,
+    $total_amount,
+    SHIPPING_FEE,
+    $transaction_image,
+    'Gcash',
+    $payment_option,
+    'Pending',
+    'Pending',
+    $payment_id,
+    implode(',', $product_ids),
+    $address['full_name'],
+    $address['phone'],
+    format_address($address),
+    $address['latitude'],
+    $address['longitude']
+));
 
-        // Using product IDs string for payment record
-        $product_ids_str = isset($_POST['product_ids']) ? $_POST['product_ids'] : '';
-        $statement->execute(array(
-            $_SESSION['customer']['cust_id'],
-            $_SESSION['customer']['cust_name'],
-            $_SESSION['customer']['cust_email'],
-            $payment_date,
-            $_POST['amount'],
-            $unique_name, // Save the file name to DB, not full path
-            'Gcash',
-            'Pending',
-            'Pending',
-            $payment_id,
-            $product_ids_str
-        ));
+// The submitted GCash payment, waiting for the admin's confirmation
+$statement = $pdo->prepare("INSERT INTO tbl_payment_history (payment_id, amount, payment_type, payment_method, reference_no, transaction_image, status, submitted_at)
+                            VALUES (?,?,?,?,?,?,?,?)");
+$statement->execute(array($payment_id, $amount_now, $payment_type, 'Gcash', $reference_no, $transaction_image, 'Pending', $payment_date));
 
-        // Explode product IDs (comma-separated string)
-        $selected_product_ids = array();
-        if (!empty($product_ids_str)) {
-            $selected_product_ids = explode(',', $product_ids_str);
-            // Trim whitespace
-            $selected_product_ids = array_map('trim', $selected_product_ids);
-        }
+$stmt_order = $pdo->prepare("INSERT INTO tbl_order (
+                                product_id,
+                                product_name,
+                                quantity,
+                                unit_price,
+                                payment_id
+                            ) VALUES (?,?,?,?,?)");
+$stmt_stock = $pdo->prepare("UPDATE tbl_product SET p_qty=GREATEST(p_qty-?,0) WHERE p_id=?");
+foreach ($items as $item) {
+    $stmt_order->execute(array($item['id'], $item['name'], $item['qty'], $item['price'], $payment_id));
+    $stmt_stock->execute(array($item['qty'], $item['id']));
+}
 
-        // Get cart session arrays
-        $cart_p_id = isset($_SESSION['cart_p_id']) ? $_SESSION['cart_p_id'] : array();
-        $cart_p_qty = isset($_SESSION['cart_p_qty']) ? $_SESSION['cart_p_qty'] : array();
-        $cart_p_name = isset($_SESSION['cart_p_name']) ? $_SESSION['cart_p_name'] : array();
-        $cart_p_current_price = isset($_SESSION['cart_p_current_price']) ? $_SESSION['cart_p_current_price'] : array();
-        $cart_p_featured_photo = isset($_SESSION['cart_p_featured_photo']) ? $_SESSION['cart_p_featured_photo'] : array();
+add_order_timeline($pdo, $payment_id, 'Order Placed',
+    'Your order of ' . count($items) . ' item(s) with a total of ' . peso($total_amount) . ' has been placed.');
+add_order_timeline($pdo, $payment_id, 'Payment Submitted',
+    $payment_type . ' of ' . peso($amount_now) . ' via GCash (Ref. No. ' . $reference_no . ') was submitted for verification.');
 
-        foreach ($selected_product_ids as $selected_id) {
-            $key = array_search($selected_id, $cart_p_id);
-            if ($key !== false) {
-                // Gather product info
-                $product_id = $cart_p_id[$key];
-                $product_name = $cart_p_name[$key];
-                $quantity = $cart_p_qty[$key];
-                $unit_price = $cart_p_current_price[$key];
-
-                // Insert order record
-                $stmt_order = $pdo->prepare("INSERT INTO tbl_order (
-                                        product_id,
-                                        product_name,
-                                        quantity, 
-                                        unit_price, 
-                                        payment_id
-                                    ) VALUES (?,?,?,?,?)");
-                $stmt_order->execute(array(
-                    $product_id,
-                    $product_name,
-                    $quantity,
-                    $unit_price,
-                    $payment_id
-                ));
-
-                // Update stock accordingly
-                $stmt_stock = $pdo->prepare("SELECT p_qty FROM tbl_product WHERE p_id=?");
-                $stmt_stock->execute([$product_id]);
-                $current_stock = $stmt_stock->fetchColumn();
-                $new_stock = max(0, $current_stock - $quantity);
-                $stmt_update = $pdo->prepare("UPDATE tbl_product SET p_qty=? WHERE p_id=?");
-                $stmt_update->execute([$new_stock, $product_id]);
-
-                // Remove from cart arrays
-                unset($cart_p_id[$key]);
-                unset($cart_p_qty[$key]);
-                unset($cart_p_name[$key]);
-                unset($cart_p_current_price[$key]);
-                unset($cart_p_featured_photo[$key]);
-            }
-        }
-
-        // Reindex to keep arrays sequential
-        $_SESSION['cart_p_id'] = array_values($cart_p_id);
-        $_SESSION['cart_p_qty'] = array_values($cart_p_qty);
-        $_SESSION['cart_p_name'] = array_values($cart_p_name);
-        $_SESSION['cart_p_current_price'] = array_values($cart_p_current_price);
-        $_SESSION['cart_p_featured_photo'] = array_values($cart_p_featured_photo);
-
-        header('location: ../../payment_success.php');
-        exit;
+// Remove the ordered items from the cart
+foreach ($_SESSION['cart_p_id'] as $key => $p_id) {
+    if (in_array($p_id, $product_ids)) {
+        unset($_SESSION['cart_p_id'][$key]);
+        unset($_SESSION['cart_p_qty'][$key]);
+        unset($_SESSION['cart_p_name'][$key]);
+        unset($_SESSION['cart_p_current_price'][$key]);
+        unset($_SESSION['cart_p_featured_photo'][$key]);
     }
 }
-?>
+if (count($_SESSION['cart_p_id']) == 0) {
+    unset($_SESSION['cart_p_id'], $_SESSION['cart_p_qty'], $_SESSION['cart_p_name'], $_SESSION['cart_p_current_price'], $_SESSION['cart_p_featured_photo']);
+} else {
+    // Reindex to keep arrays sequential
+    $_SESSION['cart_p_id'] = array_values($_SESSION['cart_p_id']);
+    $_SESSION['cart_p_qty'] = array_values($_SESSION['cart_p_qty']);
+    $_SESSION['cart_p_name'] = array_values($_SESSION['cart_p_name']);
+    $_SESSION['cart_p_current_price'] = array_values($_SESSION['cart_p_current_price']);
+    $_SESSION['cart_p_featured_photo'] = array_values($_SESSION['cart_p_featured_photo']);
+}
+unset($_SESSION['selected_items']);
+
+header('location: ../../payment_success.php?payment_id=' . urlencode($payment_id));
+exit;
